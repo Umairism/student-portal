@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import { supabase } from '../../supabase.js';
 
 const Profile = () => {
   const [profile, setProfile] = useState({
@@ -77,58 +77,78 @@ const Profile = () => {
   };
 
   return (
-    <div className="page-container">
-      <h2>Personal Information</h2>
-      <form onSubmit={updateProfile}>
-        <div className="form-group">
-          <label htmlFor="fullName">Full Name</label>
-          <input
-            id="fullName"
-            type="text"
-            value={profile.full_name || ''}
-            onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-          />
+    <div className="content-wrapper">
+      <div className="page-header">
+        <h1 className="page-title">Personal Information</h1>
+        <p className="page-subtitle">Manage your personal details and contact information</p>
+      </div>
+      
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">Student Profile</h3>
         </div>
-        <div className="form-group">
-          <label htmlFor="studentId">Student ID</label>
-          <input
-            id="studentId"
-            type="text"
-            value={profile.student_id || ''}
-            onChange={(e) => setProfile({ ...profile, student_id: e.target.value })}
-          />
+        <div className="card-body">
+          <form onSubmit={updateProfile}>
+            <div className="form-grid">
+              <div className="form-group">
+                <label htmlFor="fullName">Full Name</label>
+                <input
+                  id="fullName"
+                  type="text"
+                  value={profile.full_name || ''}
+                  onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                  placeholder="Enter your full name"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="studentId">Student ID</label>
+                <input
+                  id="studentId"
+                  type="text"
+                  value={profile.student_id || ''}
+                  onChange={(e) => setProfile({ ...profile, student_id: e.target.value })}
+                  placeholder="Enter your student ID"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="department">Department</label>
+                <input
+                  id="department"
+                  type="text"
+                  value={profile.department || ''}
+                  onChange={(e) => setProfile({ ...profile, department: e.target.value })}
+                  placeholder="Enter your department"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="semester">Semester</label>
+                <input
+                  id="semester"
+                  type="text"
+                  value={profile.semester || ''}
+                  onChange={(e) => setProfile({ ...profile, semester: e.target.value })}
+                  placeholder="Enter current semester"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="phone">Phone Number</label>
+                <input
+                  id="phone"
+                  type="tel"
+                  value={profile.phone || ''}
+                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                  placeholder="Enter your phone number"
+                />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="submit" className="btn btn-primary">
+                Update Profile
+              </button>
+            </div>
+          </form>
         </div>
-        <div className="form-group">
-          <label htmlFor="department">Department</label>
-          <input
-            id="department"
-            type="text"
-            value={profile.department || ''}
-            onChange={(e) => setProfile({ ...profile, department: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="semester">Semester</label>
-          <input
-            id="semester"
-            type="text"
-            value={profile.semester || ''}
-            onChange={(e) => setProfile({ ...profile, semester: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="phone">Phone</label>
-          <input
-            id="phone"
-            type="tel"
-            value={profile.phone || ''}
-            onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-          />
-        </div>
-        <button type="submit" className="btn btn-primary">
-          Update Profile
-        </button>
-      </form>
+      </div>
     </div>
   );
 };

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   FaUser, 
   FaGraduationCap, 
@@ -12,7 +12,7 @@ import {
   FaBars,
   FaSignOutAlt
 } from 'react-icons/fa';
-import { supabase } from '../../supabaseClient';  // Make sure you import your Supabase client
+import { supabase } from '../../supabase.js';
 
 const menuItems = [
   { path: '/profile', icon: <FaUser />, label: 'Modify Personal' },
@@ -29,46 +29,82 @@ const menuItems = [
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const sidebarRef = useRef(null);
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
 
+  const closeSidebar = () => {
+    setIsOpen(false);
+  };
+
+  // Close sidebar when route changes
+  useEffect(() => {
+    closeSidebar();
+  }, [location.pathname]);
+
+  // Close sidebar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target) && isOpen) {
+        closeSidebar();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();  // Supabase sign-out
-      navigate('/auth');  // Redirect to Auth page (login/signup)
+      await supabase.auth.signOut();
+      navigate('/auth');
+      closeSidebar();
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
 
-  return (
-    <div className={`sidebar ${isOpen ? 'open' : ''}`}>
-      <button className="menu-button" onClick={toggleSidebar}>
-        <FaBars />
-      </button>
+  const handleMenuItemClick = () => {
+    closeSidebar();
+  };
 
-      <div className="menu-items">
-        {menuItems.map((item) => (
-          item.label === 'Sign Out' ? (
-            <button key={item.path} onClick={handleLogout} className="menu-item logout">
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ) : (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </NavLink>
-          )
-        ))}
+  return (
+    <>
+      {/* Overlay for mobile */}
+      {isOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
+      
+      <div ref={sidebarRef} className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <button className="menu-button" onClick={toggleSidebar}>
+          <FaBars />
+        </button>
+
+        <div className="menu-items">
+          {menuItems.map((item) => (
+            item.label === 'Sign Out' ? (
+              <button key={item.path} onClick={handleLogout} className="menu-item logout">
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            ) : (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}
+                onClick={handleMenuItemClick}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </NavLink>
+            )
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

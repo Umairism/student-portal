@@ -25,21 +25,21 @@ The backend of the application is powered by Supabase, which provides a scalable
 To run this project locally, follow these steps:
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/student-portal.git
-   ```
+
+   git clone https://github.com/Umairism/student-portal.git
+
 2. Navigate to the project directory:
-   ```bash
+
    cd student-portal
-   ```
+
 3. Install the dependencies:
-   ```bash
+
    npm install
-   ```
+
 4. Start the development server:
-   ```bash
+
    npm start
-   ```
+
 
 ## Contributing
 
