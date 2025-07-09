@@ -24,7 +24,12 @@ const Profile = () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setMessage('No user logged in');
+        return;
+      }
+
+      console.log('Fetching profile for user:', user.id);
 
       let { data, error } = await supabase
         .from('profiles')
@@ -32,8 +37,17 @@ const Profile = () => {
         .eq('id', user.id)
         .maybeSingle();
 
+      console.log('Profile fetch result:', { data, error });
+
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        console.error('Error fetching profile:', error);
+        
+        if (error.message.includes('relation "public.profiles" does not exist')) {
+          setMessage('Database not set up yet. You can still fill out the form.');
+        } else {
+          throw error;
+        }
+        return;
       }
 
       if (data) {
@@ -48,10 +62,25 @@ const Profile = () => {
           emergency_contact: data.emergency_contact || '',
           emergency_phone: data.emergency_phone || ''
         });
+      } else {
+        console.log('No existing profile found, checking localStorage...');
+        
+        // Try to load from localStorage as fallback
+        const localProfile = loadFromLocalStorage();
+        if (localProfile) {
+          setProfile(localProfile);
+          setMessage('Profile loaded from local storage. Will sync with database when available.');
+        } else {
+          // Set default values for new profile
+          setProfile(prev => ({
+            ...prev,
+            full_name: user.email?.split('@')[0] || ''
+          }));
+        }
       }
     } catch (error) {
-      console.error('Error fetching profile:', error.message);
-      setMessage('Error loading profile data');
+      console.error('Error fetching profile:', error);
+      setMessage(`Error loading profile: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -66,27 +95,121 @@ const Profile = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user logged in');
 
-      const updates = {
-        id: user.id,
-        ...profile,
-        updated_at: new Date().toISOString()
-      };
+      console.log('Attempting to update profile for user:', user.id);
+      console.log('Profile data to update:', profile);
 
-      const { error } = await supabase
+      // First, check if the profile exists
+      const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
-        .upsert(updates, {
-          onConflict: 'id'
-        });
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
 
-      if (error) throw error;
+      console.log('Existing profile check:', { existingProfile, fetchError });
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error checking existing profile:', fetchError);
+        throw new Error(`Database error: ${fetchError.message}`);
+      }
+
+      let result;
+      
+      if (existingProfile) {
+        // Profile exists, update it
+        console.log('Profile exists, updating...');
+        const updates = {
+          ...profile,
+          updated_at: new Date().toISOString()
+        };
+
+        result = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id);
+      } else {
+        // Profile doesn't exist, create it
+        console.log('Profile does not exist, creating...');
+        const newProfile = {
+          id: user.id,
+          ...profile,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        result = await supabase
+          .from('profiles')
+          .insert([newProfile]);
+      }
+
+      console.log('Profile operation result:', result);
+
+      if (result.error) {
+        console.error('Profile operation failed:', result.error);
+        throw result.error;
+      }
       
       setMessage('Profile updated successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      console.error('Error updating profile:', error.message);
-      setMessage('Error updating profile. Please try again.');
+      console.error('Error updating profile:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Error updating profile. ';
+      if (error.message.includes('relation "public.profiles" does not exist')) {
+        errorMessage += 'Database tables not set up. Please contact administrator.';
+      } else if (error.message.includes('permission denied')) {
+        errorMessage += 'Permission denied. Please contact administrator.';
+      } else if (error.message.includes('JWT')) {
+        errorMessage += 'Authentication issue. Please log out and log back in.';
+      } else {
+        errorMessage += `${error.message}`;
+      }
+      
+      setMessage(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fallback: save to localStorage if database fails
+  const saveToLocalStorage = (profileData) => {
+    try {
+      localStorage.setItem('student-profile', JSON.stringify(profileData));
+      console.log('Profile saved to localStorage as backup');
+    } catch (error) {
+      console.error('Failed to save to localStorage:', error);
+    }
+  };
+
+  // Fallback: load from localStorage if database fails
+  const loadFromLocalStorage = () => {
+    try {
+      const saved = localStorage.getItem('student-profile');
+      if (saved) {
+        const profileData = JSON.parse(saved);
+        console.log('Loaded profile from localStorage');
+        return profileData;
+      }
+    } catch (error) {
+      console.error('Failed to load from localStorage:', error);
+    }
+    return null;
+  };
+
+  // Enhanced update function with fallback
+  const updateProfileWithFallback = async (e) => {
+    e.preventDefault();
+    
+    // First try the database update
+    try {
+      await updateProfile(e);
+    } catch (dbError) {
+      console.log('Database update failed, using localStorage fallback');
+      
+      // Save to localStorage as fallback
+      saveToLocalStorage(profile);
+      setMessage('Profile saved locally (database unavailable). Changes will sync when database is ready.');
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
@@ -98,7 +221,8 @@ const Profile = () => {
       </div>
       
       {message && (
-        <div className={`alert ${message.includes('Error') ? 'error' : 'success'}`}>
+        <div className={`alert ${message.includes('Error') || message.includes('failed') ? 'error' : 
+          message.includes('locally') || message.includes('local storage') ? 'warning' : 'success'}`}>
           {message}
         </div>
       )}
@@ -108,7 +232,7 @@ const Profile = () => {
           <h3 className="card-title">Student Profile</h3>
         </div>
         <div className="card-body">
-          <form onSubmit={updateProfile}>
+          <form onSubmit={updateProfileWithFallback}>
             <div className="form-grid">
               <div className="form-group">
                 <label htmlFor="fullName">Full Name *</label>

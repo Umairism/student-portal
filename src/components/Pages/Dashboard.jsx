@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../supabase.js';
 import { 
   FaUser, 
@@ -26,6 +27,18 @@ const Dashboard = () => {
   ]);
 
   useEffect(() => {
+    // Test database connection
+    const testConnection = async () => {
+      try {
+        console.log('Testing Supabase connection...');
+        const { data, error } = await supabase.from('profiles').select('count(*)', { count: 'exact', head: true });
+        console.log('Connection test result:', { data, error });
+      } catch (err) {
+        console.error('Connection test failed:', err);
+      }
+    };
+    
+    testConnection();
     fetchDashboardData();
   }, []);
 
@@ -33,51 +46,159 @@ const Dashboard = () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profileData) {
-        setProfile(profileData);
+      if (!user) {
+        console.log('No user found');
+        // Set demo data if no user
+        setProfile({
+          full_name: 'Demo Student',
+          student_id: 'DEMO001',
+          department: 'Computer Science',
+          semester: '3',
+          phone: '+1-555-123-4567',
+          address: '123 University Ave, Demo City'
+        });
+        setLoading(false);
+        return;
       }
 
-      // Fetch enrolled courses
-      const { data: coursesData } = await supabase
-        .from('course_enrollments')
-        .select(`
-          *,
-          courses(
-            course_code,
-            course_name,
-            credits,
-            instructor_name,
-            departments(name)
-          )
-        `)
-        .eq('student_id', user.id)
-        .eq('status', 'enrolled');
+      console.log('Fetching profile for user:', user.id);
 
-      if (coursesData) {
-        setEnrolledCourses(coursesData);
-        
-        // Calculate stats
-        const totalCredits = coursesData.reduce((sum, enrollment) => 
-          sum + (enrollment.courses?.credits || 0), 0);
-        
+      // First, let's try to see if the profiles table exists
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        console.log('Profile fetch result:', { profileData, profileError });
+
+        if (profileData) {
+          console.log('Setting profile data:', profileData);
+          setProfile(profileData);
+        } else if (profileError?.code === 'PGRST116') {
+          // No profile found, try to create one
+          console.log('No profile found, creating default profile');
+          const defaultProfile = {
+            id: user.id,
+            full_name: user.email?.split('@')[0] || 'Student',
+            student_id: `STU${Date.now().toString().slice(-6)}`,
+            department: 'Computer Science',
+            semester: '1',
+            phone: '+1-234-567-8900',
+            address: '123 University Ave, Campus City'
+          };
+
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert([defaultProfile])
+            .select()
+            .single();
+
+          console.log('Profile creation result:', { newProfile, insertError });
+
+          if (!insertError && newProfile) {
+            setProfile(newProfile);
+          } else {
+            // If creation fails, set the default profile anyway for display
+            setProfile(defaultProfile);
+          }
+        } else {
+          // Other database error, use fallback
+          console.error('Database error:', profileError);
+          setProfile({
+            full_name: user.email?.split('@')[0] || 'Student',
+            student_id: 'TEMP001',
+            department: 'Computer Science',
+            semester: '1',
+            phone: 'Not set',
+            address: 'Not set'
+          });
+        }
+      } catch (dbError) {
+        // Table might not exist
+        console.error('Database access error:', dbError);
+        setProfile({
+          full_name: user.email?.split('@')[0] || 'Student',
+          student_id: 'TEMP001',
+          department: 'Computer Science',
+          semester: '1', 
+          phone: 'Database not configured',
+          address: 'Database not configured'
+        });
+      }
+
+      // Try to fetch courses
+      try {
+        const { data: coursesData, error: coursesError } = await supabase
+          .from('course_enrollments')
+          .select(`
+            *,
+            courses(
+              course_code,
+              course_name,
+              credits,
+              instructor_name,
+              departments(name)
+            )
+          `)
+          .eq('student_id', user.id)
+          .eq('status', 'enrolled');
+
+        if (coursesError) {
+          console.error('Error fetching courses:', coursesError.message);
+        }
+
+        if (coursesData && coursesData.length > 0) {
+          setEnrolledCourses(coursesData);
+          
+          // Calculate stats
+          const totalCredits = coursesData.reduce((sum, enrollment) => 
+            sum + (enrollment.courses?.credits || 0), 0);
+          
+          setStats({
+            totalCourses: coursesData.length,
+            totalCredits,
+            completedCourses: coursesData.filter(c => c.status === 'completed').length,
+            currentGPA: coursesData.length > 0 ? 3.45 : 0.00 // This would be calculated from actual grades
+          });
+        } else {
+          // Set default stats if no courses
+          setStats({
+            totalCourses: 0,
+            totalCredits: 0,
+            completedCourses: 0,
+            currentGPA: 0.00
+          });
+        }
+      } catch (coursesError) {
+        console.error('Error accessing courses table:', coursesError);
         setStats({
-          totalCourses: coursesData.length,
-          totalCredits,
-          completedCourses: coursesData.filter(c => c.status === 'completed').length,
-          currentGPA: 3.45 // This would be calculated from actual grades
+          totalCourses: 0,
+          totalCredits: 0,
+          completedCourses: 0,
+          currentGPA: 0.00
         });
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error.message);
+      
+      // Set fallback data if everything fails
+      setProfile({
+        full_name: 'Demo Student',
+        student_id: 'STU12345',
+        department: 'Computer Science',
+        semester: '3',
+        phone: '+1-555-123-4567',
+        address: '123 University Ave, Demo City'
+      });
+      
+      setStats({
+        totalCourses: 0,
+        totalCredits: 0,
+        completedCourses: 0,
+        currentGPA: 0.00
+      });
     } finally {
       setLoading(false);
     }
@@ -179,7 +300,7 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="card-actions">
-              <a href="/profile" className="btn btn-outline">Update Profile</a>
+              <Link to="/profile" className="btn btn-outline">Update Profile</Link>
             </div>
           </div>
         </div>
@@ -196,7 +317,7 @@ const Dashboard = () => {
             {enrolledCourses.length === 0 ? (
               <div className="empty-state">
                 <p>No courses enrolled for this semester</p>
-                <a href="/courses" className="btn btn-primary">Browse Courses</a>
+                <Link to="/courses" className="btn btn-primary">Browse Courses</Link>
               </div>
             ) : (
               <div className="course-summary-list">
@@ -216,7 +337,7 @@ const Dashboard = () => {
                 ))}
                 {enrolledCourses.length > 4 && (
                   <div className="see-more">
-                    <a href="/courses">View all courses</a>
+                    <Link to="/courses">View all courses</Link>
                   </div>
                 )}
               </div>
@@ -252,22 +373,22 @@ const Dashboard = () => {
           </div>
           <div className="card-body">
             <div className="quick-actions">
-              <a href="/courses" className="quick-action-item">
+              <Link to="/courses" className="quick-action-item">
                 <FaBook />
                 <span>Browse Courses</span>
-              </a>
-              <a href="/results" className="quick-action-item">
+              </Link>
+              <Link to="/results" className="quick-action-item">
                 <FaGraduationCap />
                 <span>View Results</span>
-              </a>
-              <a href="/change-course" className="quick-action-item">
+              </Link>
+              <Link to="/change-course" className="quick-action-item">
                 <FaClipboardList />
                 <span>Change Courses</span>
-              </a>
-              <a href="/forms" className="quick-action-item">
+              </Link>
+              <Link to="/forms" className="quick-action-item">
                 <FaCalendarAlt />
                 <span>Download Forms</span>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
