@@ -6,6 +6,7 @@ import Header from './components/Layout/Header';
 import Sidebar from './components/Layout/Sidebar';
 import './styles/global.css';
 
+import Dashboard from './components/Pages/Dashboard';
 import Profile from './components/Pages/Profile';
 import Results from './components/Pages/Results';
 import Courses from './components/Pages/Courses';
@@ -59,9 +60,9 @@ function App() {
     return <div className="loading-spinner">Loading...</div>;
   }
 
-  // If user is authenticated but on auth page, redirect to profile
+  // If user is authenticated but on auth page, redirect to dashboard
   if (session && location.pathname === '/auth') {
-    return <Navigate to="/profile" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (
@@ -71,6 +72,7 @@ function App() {
         {session && <Header />}
         <Routes>
           <Route path="/auth" element={<AuthForm />} />
+          <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
           <Route path="/profile" element={<ProtectedRoute element={<Profile />} />} />
           <Route path="/results" element={<ProtectedRoute element={<Results />} />} />
           <Route path="/courses" element={<ProtectedRoute element={<Courses />} />} />
@@ -79,7 +81,7 @@ function App() {
           <Route path="/contact" element={<ProtectedRoute element={<Contact />} />} />
           <Route path="/settings" element={<ProtectedRoute element={<Settings />} />} />
           <Route path="/layout" element={<ProtectedRoute element={<Layout />} />} />
-          <Route path="/" element={session ? <Navigate to="/profile" replace /> : <Navigate to="/auth" replace />} />
+          <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <Navigate to="/auth" replace />} />
         </Routes>
       </div>
     </div>

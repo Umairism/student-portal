@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
+  FaHome,
   FaUser, 
   FaGraduationCap, 
   FaBook, 
@@ -15,6 +16,7 @@ import {
 import { supabase } from '../../supabase.js';
 
 const menuItems = [
+  { path: '/dashboard', icon: <FaHome />, label: 'Dashboard' },
   { path: '/profile', icon: <FaUser />, label: 'Modify Personal' },
   { path: '/results', icon: <FaGraduationCap />, label: 'Check Semester Result' },
   { path: '/courses', icon: <FaBook />, label: 'Select Courses' },
